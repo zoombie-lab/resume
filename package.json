@@ -24,7 +24,8 @@
     "firebase": "^10.13.0",
     "axios": "^1.7.5",
     "openai": "^4.56.1",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "eslint-plugin-react-hooks": "^4.6.2"
