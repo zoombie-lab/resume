@@ -19,6 +19,8 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
 
 // Set up storage for multer (file uploads)
 const storage = multer.memoryStorage();
