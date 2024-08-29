@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const { OpenAI } = require('openai');
 const extractFileContent = require('./extractFileContent.js'); // Import the new function
 require('dotenv').config();
+const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
