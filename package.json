@@ -26,8 +26,8 @@
   "main": "index.js",
   "scripts": {
   "dev": "node server.js",
-  "build": "next build",
-  "start": "next start",
+  "build": "echo 'No build step required for basic Node.js projects'",
+  "start": "node server.js",
   "test": "echo \"Error: no test specified\" && exit 1"
 },
   "keywords": [],
