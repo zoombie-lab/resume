@@ -46,22 +46,43 @@ const upload = multer({
 // Endpoint to handle the form data
 app.post('/api/upload', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 'coverLetter', maxCount: 1 }]), async (req, res) => {
     try {
-        // Extract files and data from the form
+        console.log('Received upload request');
+
         const resumeFile = req.files['resume'] ? req.files['resume'][0] : null;
         const coverLetterFile = req.files['coverLetter'] ? req.files['coverLetter'][0] : null;
         const jobDescription = req.body.jobDescription;
 
-        console.log('Files received and extracted successfully');
+        console.log('Resume file:', resumeFile ? resumeFile.originalname : 'Not provided');
+        console.log('Cover letter file:', coverLetterFile ? coverLetterFile.originalname : 'Not provided');
+        console.log('Job description provided:', !!jobDescription);
 
+        let resumeContent = '';
+        let coverLetterContent = '';
 
-        // Validate that required files are present
-        if (!resumeFile || !coverLetterFile || !jobDescription) {
-            return res.status(400).json({ error: 'Missing required files or job description' });
+        if (resumeFile) {
+            try {
+                resumeContent = await extractFileContent(resumeFile);
+                console.log('Resume content extracted successfully');
+            } catch (error) {
+                console.error('Failed to extract resume content:', error);
+            }
         }
 
-        // Extract file contents
-        const resumeContent = await extractFileContent(resumeFile);
-        const coverLetterContent = await extractFileContent(coverLetterFile);
+        if (coverLetterFile) {
+            try {
+                coverLetterContent = await extractFileContent(coverLetterFile);
+                console.log('Cover letter content extracted successfully');
+            } catch (error) {
+                console.error('Failed to extract cover letter content:', error);
+            }
+        }
+
+        if (!jobDescription) {
+            console.error('Job description is missing');
+            return res.status(400).json({ error: 'Job description is required' });
+        }
+
+        
 
         // Prepare data for OpenAI API
         const prompt = `Based on the following resume, cover letter, and job description, create an improved resume and a tailored cover letter. Clearly separate the two with "===RESUME===" before the resume and "===COVER LETTER===" before the cover letter. 
@@ -69,10 +90,10 @@ app.post('/api/upload', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 
         Also, use human-natural sounding language in your writing. Do not sound like an AI model writing!
 
 Resume:
-${resumeContent}
+        ${resumeContent || "No resume provided. Please generate a suitable resume based on the job description."}
 
 Cover Letter:
-${coverLetterContent}
+        ${coverLetterContent || "No cover letter provided. Please generate a suitable cover letter based on the job description."}
 
 Job Description:
 ${jobDescription}
