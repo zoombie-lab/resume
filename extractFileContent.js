@@ -4,7 +4,7 @@ const mammoth = require('mammoth');
 async function extractFileContent(file) {
     const buffer = file.buffer;
     const mimeType = file.mimetype;
-
+    console.log('file received in extractedFile function');
     try {
         if (mimeType === 'application/pdf') {
             const data = await pdf(buffer);
