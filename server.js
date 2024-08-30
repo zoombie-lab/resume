@@ -103,7 +103,7 @@ Please provide an improved resume and a tailored cover letter.`;
 
         // Send request to OpenAI API
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o", // Ensure correct model name
+            model: "gpt-4o-mini", // Ensure correct model name
             messages: [{ role: "user", content: prompt }],
             max_tokens: 3000 // Adjust as needed
         });
