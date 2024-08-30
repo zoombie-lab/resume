@@ -51,6 +51,9 @@ app.post('/api/upload', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 
         const coverLetterFile = req.files['coverLetter'] ? req.files['coverLetter'][0] : null;
         const jobDescription = req.body.jobDescription;
 
+        console.log('Files received and extracted successfully');
+
+
         // Validate that required files are present
         if (!resumeFile || !coverLetterFile || !jobDescription) {
             return res.status(400).json({ error: 'Missing required files or job description' });
@@ -75,19 +78,24 @@ Job Description:
 ${jobDescription}
 
 Please provide an improved resume and a tailored cover letter.`;
+        console.log('Sending request to OpenAI API...');
 
         // Send request to OpenAI API
         const completion = await openai.chat.completions.create({
-            model: "gpt-4", // Ensure correct model name
+            model: "gpt-4o", // Ensure correct model name
             messages: [{ role: "user", content: prompt }],
             max_tokens: 3000 // Adjust as needed
         });
+        console.log('Received response from OpenAI API');
 
         // Extract the response
         const fullResponse = completion.choices[0].message.content;
+        
+        console.log('Full response extracted successfully');
 
         // Split the response into resume and cover letter
         const [resumeContentNew, coverLetterContentNew] = fullResponse.split('===COVER LETTER===').map(content => content.trim());
+         console.log('Response split into resume and cover letter');
 
         // Function to create a DOCX document
         const createDocx = (content) => {
@@ -106,6 +114,7 @@ Please provide an improved resume and a tailored cover letter.`;
         // Generate buffers
         const resumeBuffer = await Packer.toBuffer(resumeDoc);
         const coverLetterBuffer = await Packer.toBuffer(coverLetterDoc);
+        console.log('DOCX buffers generated successfully');
 
         // Send the buffers back to the client
         res.json({ 
@@ -113,9 +122,20 @@ Please provide an improved resume and a tailored cover letter.`;
             resumeBuffer: resumeBuffer.toString('base64'),
             coverLetterBuffer: coverLetterBuffer.toString('base64')
         });
+        console.log('Response sent to client successfully');
 
     } catch (error) {
-        console.error('Error processing upload or OpenAI request:', error);
+        console.error('Error in /api/upload:', error);
+        
+        if (error instanceof OpenAI.APIError) {
+            console.error('OpenAI API Error:', {
+                status: error.status,
+                message: error.message,
+                code: error.code,
+                type: error.type
+            });
+        }
+        
         res.status(500).json({ error: 'Failed to process upload or generate documents.' });
     }
 });
