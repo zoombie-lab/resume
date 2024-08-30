@@ -4,9 +4,11 @@ const path = require('path');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { OpenAI } = require('openai');
-const extractFileContent = require('./extractFileContent.js'); // Import the new function
+const extractFileContent = require('./extractFileContent.js');
 require('dotenv').config();
 const cors = require('cors');
+const docx = require('docx');
+const { Document, Paragraph, Packer } = docx;
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -21,14 +23,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
-
 // Set up storage for multer (file uploads)
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // Increased limit to 10MB for larger files
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        const allowedTypes = [
+            'application/pdf', 
+            'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
         if (!allowedTypes.includes(file.mimetype)) {
             const error = new Error('Invalid file type');
             error.code = 'INVALID_FILE_TYPE';
@@ -56,7 +61,9 @@ app.post('/api/upload', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 
         const coverLetterContent = await extractFileContent(coverLetterFile);
 
         // Prepare data for OpenAI API
-        const prompt = `Analyze the following resume and cover letter for the given job description:
+        const prompt = `Based on the following resume, cover letter, and job description, create an improved resume and a tailored cover letter. Clearly separate the two with "===RESUME===" before the resume and "===COVER LETTER===" before the cover letter. 
+        If there are no resume or cover letter provided, please generate both resume and cover letter that's most suitable for the job description at hand. Remember to clearly separate the two with "===RESUME===" and "===COVER LETTER===" as per your instructions.
+        Also, use human-natural sounding language in your writing. Do not sound like an AI model writing!
 
 Resume:
 ${resumeContent}
@@ -67,30 +74,62 @@ ${coverLetterContent}
 Job Description:
 ${jobDescription}
 
-Please provide an analysis of the candidate's suitability for the job, highlighting strengths and potential areas for improvement.`;
+Please provide an improved resume and a tailored cover letter.`;
 
         // Send request to OpenAI API
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o", // Choose an appropriate model
+            model: "gpt-4", // Ensure correct model name
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 1000 // Adjust as needed
+            max_tokens: 3000 // Adjust as needed
         });
 
         // Extract the response
-        const analysis = completion.choices[0].message.content;
+        const fullResponse = completion.choices[0].message.content;
 
-        // Send the analysis back to the client
-        res.json({ message: 'Analysis complete', analysis: analysis });
+        // Split the response into resume and cover letter
+        const [resumeContentNew, coverLetterContentNew] = fullResponse.split('===COVER LETTER===').map(content => content.trim());
+
+        // Function to create a DOCX document
+        const createDocx = (content) => {
+            return new Document({
+                sections: [{
+                    properties: {},
+                    children: content.split('\n').filter(para => para.trim() !== '').map(para => new Paragraph({ text: para }))
+                }]
+            });
+        };
+
+        // Create DOCX documents
+        const resumeDoc = createDocx(resumeContentNew.replace('===RESUME===', '').trim());
+        const coverLetterDoc = createDocx(coverLetterContentNew);
+
+        // Generate buffers
+        const resumeBuffer = await Packer.toBuffer(resumeDoc);
+        const coverLetterBuffer = await Packer.toBuffer(coverLetterDoc);
+
+        // Send the buffers back to the client
+        res.json({ 
+            message: 'Documents generated successfully',
+            resumeBuffer: resumeBuffer.toString('base64'),
+            coverLetterBuffer: coverLetterBuffer.toString('base64')
+        });
 
     } catch (error) {
         console.error('Error processing upload or OpenAI request:', error);
-        res.status(500).json({ error: 'Failed to process upload or generate analysis.' });
+        res.status(500).json({ error: 'Failed to process upload or generate documents.' });
     }
 });
 
-// Error handling middleware (unchanged)
+// Error handling middleware
+app.use((err, req, res, next) => {
+    if (err.code === 'INVALID_FILE_TYPE') {
+        return res.status(400).json({ error: 'Invalid file type. Please upload PDF, DOC, or DOCX files only.' });
+    }
+    res.status(500).json({ error: 'An internal server error occurred.' });
+});
 
 // Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
